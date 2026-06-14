@@ -1,0 +1,6 @@
+id,restaurant_id,branch_id,title,description,frequency,due_time,is_active
+1,1,1,"Clean the kitchen","Clean all surfaces and mop the floor",daily,"18:00:00",true
+2,1,1,"Check inventory","Check stock levels and reorder if necessary",weekly,"18:00:00",true
+3,1,1,"Update menu","Review and update the menu items",monthly,"18:00:00",true
+4,1,1,"Staff meeting","Hold a staff meeting to discuss operations",weekly,"18:00:00",true
+5,1,1,"Customer feedback review","Review customer feedback and address any issues",weekly,"18:00:00",true
