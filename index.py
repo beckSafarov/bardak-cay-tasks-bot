@@ -1,6 +1,8 @@
 import asyncio
 import logging
 
+import html
+
 from aiogram import Bot, Dispatcher, types, Router
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -8,6 +10,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from utils.db import TELEGRAM_BOT_TOKEN, create_db_pool
 from utils.managers import fetch_manager_by_telegram_id, fetch_task_instances_by_manager_today
 from utils.scheduler import get_tasks_to_create, schedule_tasks_for_managers
+from utils.tasks import mark_task_instance_completed
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +44,41 @@ async def cmd_start(message: types.Message, db_pool, bot: Bot):
             f"<code>{telegram_id}</code>",
             parse_mode="HTML"
         )
+
+
+@router.callback_query(
+    lambda callback: bool(callback.data and callback.data.startswith("mark_done:"))
+)
+async def on_mark_done(callback: types.CallbackQuery, db_pool):
+    """Handle inline keyboard callback to mark a task instance completed."""
+    if callback.data is None or callback.message is None:
+        await callback.answer("Unable to mark task as done.", show_alert=True)
+        return
+
+    payload = callback.data.split(":", 1)
+    if len(payload) != 2 or not payload[1].isdigit():
+        await callback.answer("Invalid action.", show_alert=True)
+        return
+
+    task_instance_id = int(payload[1])
+    async with db_pool.acquire() as conn:
+        await mark_task_instance_completed(conn, task_instance_id)
+
+    original_text = callback.message.text or ""
+    escaped_text = html.escape(original_text)
+    struck_text = f"<s>{escaped_text}</s>"
+
+    try:
+        await callback.message.edit_text(
+            struck_text,
+            parse_mode="HTML",
+            reply_markup=None,
+        )
+    except Exception:
+        pass
+
+    await callback.answer("Task marked done ✅")
+
 
 @router.message(Command("test"))
 async def cmd_test(message: types.Message, db_pool):

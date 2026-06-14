@@ -61,3 +61,19 @@ async def create_task_instance(
         due_at,
         note,
     )
+
+
+async def mark_task_instance_completed(
+    conn: asyncpg.Connection,
+    task_instance_id: int,
+) -> str:
+    """Mark a task instance as completed."""
+    return await conn.execute(
+        """
+        UPDATE task_instances
+        SET completed = true,
+            completed_at = now()
+        WHERE id = $1
+        """,
+        task_instance_id,
+    )

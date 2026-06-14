@@ -1,8 +1,12 @@
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import asyncpg
-from .tasks import fetch_all_task_templates, fetch_all_task_instances
-
+from .tasks import (
+    create_task_instance,
+    fetch_all_task_templates,
+    fetch_all_task_instances,
+)
 
 def format_due_at_relative(due_at: datetime, now: datetime) -> str:
     """Return a humanized relative due date string."""
@@ -120,31 +124,35 @@ def should_create_task_instance(
     return False, None
 
 
-async def insert_task_instance(
+async def create_scheduled_task_instance(
     conn: asyncpg.Connection,
     record: asyncpg.Record,
     due_at: datetime,
     scheduled_date: datetime.date,
-):
-    """Insert a new task instance for the resolved template/manager pair."""
-    await conn.execute(
-        """
-        INSERT INTO task_instances (
-            template_id,
-            manager_id,
-            restaurant_id,
-            branch_id,
-            scheduled_date,
-            due_at,
-            completed
-        ) VALUES ($1, $2, $3, $4, $5, $6, false)
-        """,
-        record['template_id'],
-        record['manager_id'],
-        record['restaurant_id'],
-        record['branch_id'],
+) -> asyncpg.Record:
+    """Insert and return a new task instance for the resolved template/manager pair."""
+    return await create_task_instance(
+        conn,
+        record["restaurant_id"],
+        record["branch_id"],
+        record["manager_id"],
+        record["template_id"],
         scheduled_date,
         due_at,
+    )
+
+
+def build_task_keyboard(task_instance_id: int) -> InlineKeyboardMarkup:
+    """Build the inline keyboard for marking a task done."""
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Mark Done",
+                    callback_data=f"mark_done:{task_instance_id}",
+                )
+            ]
+        ]
     )
 
 
@@ -183,14 +191,20 @@ async def schedule_tasks_for_managers(db_pool: asyncpg.Pool, bot: Bot):
             if due_at is None:
                 continue
 
-            await insert_task_instance(conn, record, due_at, scheduled_date)
-            tasks_to_notify.append((record, due_at))
+            task_instance = await create_scheduled_task_instance(
+                conn,
+                record,
+                due_at,
+                scheduled_date,
+            )
+            tasks_to_notify.append((record, due_at, task_instance["id"]))
 
-        for record, due_at in tasks_to_notify:
+        for record, due_at, task_instance_id in tasks_to_notify:
             try:
                 await bot.send_message(
-                    record['telegram_id'],
+                    record["telegram_id"],
                     build_task_message(record, due_at, now),
+                    reply_markup=build_task_keyboard(task_instance_id),
                 )
             except Exception as exc:
                 print(f"Failed to send message to {record['telegram_id']}: {exc}")
