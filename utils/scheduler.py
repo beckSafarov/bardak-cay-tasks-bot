@@ -1,13 +1,12 @@
 from datetime import datetime, timedelta, timezone
 from aiogram import Bot
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import asyncpg
 from .tasks import (
     create_task_instance,
     fetch_all_task_templates,
     fetch_all_task_instances,
 )
-from .keyboards import build_mark_done_keyboard, build_mark_undone_keyboard
+from .keyboards import build_status_update_keyboard
 
 def format_due_at_relative(due_at: datetime, now: datetime) -> str:
     """Return a humanized relative due date string."""
@@ -191,7 +190,9 @@ async def schedule_tasks_for_managers(db_pool: asyncpg.Pool, bot: Bot):
                 await bot.send_message(
                     record["telegram_id"],
                     build_task_message(record, due_at, now),
-                    reply_markup=build_mark_done_keyboard(task_instance_id),
+                    reply_markup=build_status_update_keyboard(
+                        task_instance_id, is_done=False
+                    ),
                 )
             except Exception as exc:
                 print(f"Failed to send message to {record['telegram_id']}: {exc}")

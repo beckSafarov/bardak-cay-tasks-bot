@@ -13,7 +13,4 @@ from .tasks import (
     mark_task_instance_incomplete,
 )
 from .scheduler import get_tasks_to_create
-from .keyboards import (
-    build_mark_done_keyboard,
-    build_mark_undone_keyboard,
-)
+from .keyboards import build_status_update_keyboard
