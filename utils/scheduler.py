@@ -7,6 +7,7 @@ from .tasks import (
     fetch_all_task_templates,
     fetch_all_task_instances,
 )
+from .keyboards import build_mark_done_keyboard, build_mark_undone_keyboard
 
 def format_due_at_relative(due_at: datetime, now: datetime) -> str:
     """Return a humanized relative due date string."""
@@ -142,20 +143,6 @@ async def create_scheduled_task_instance(
     )
 
 
-def build_task_keyboard(task_instance_id: int) -> InlineKeyboardMarkup:
-    """Build the inline keyboard for marking a task done."""
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="Mark Done",
-                    callback_data=f"mark_done:{task_instance_id}",
-                )
-            ]
-        ]
-    )
-
-
 def build_task_message(record: asyncpg.Record, due_at: datetime, now: datetime) -> str:
     """Build the message text for the manager."""
     description = record['description'] or 'No description'
@@ -204,7 +191,7 @@ async def schedule_tasks_for_managers(db_pool: asyncpg.Pool, bot: Bot):
                 await bot.send_message(
                     record["telegram_id"],
                     build_task_message(record, due_at, now),
-                    reply_markup=build_task_keyboard(task_instance_id),
+                    reply_markup=build_mark_done_keyboard(task_instance_id),
                 )
             except Exception as exc:
                 print(f"Failed to send message to {record['telegram_id']}: {exc}")
