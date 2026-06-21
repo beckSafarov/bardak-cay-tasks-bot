@@ -90,7 +90,7 @@ async def fetch_latest_task_instance(
     """Fetch the most recent task instance for a given template and manager."""
     return await conn.fetchrow(
         """
-        SELECT due_at, completed
+        SELECT id, due_at, completed
         FROM task_instances
         WHERE template_id = $1 AND manager_id = $2
         ORDER BY due_at DESC NULLS LAST
@@ -100,6 +100,24 @@ async def fetch_latest_task_instance(
         manager_id,
     )
 
+
+def should_notify_task_instance(
+    should_create_task_instance: bool,
+    latest_instance: asyncpg.Record | None,
+    now: datetime,
+) -> tuple[bool]:
+    """Decide whether the task instance should be notified."""
+    
+    if should_create_task_instance:
+        return True
+
+    max_due_at = latest_instance['due_at']
+    completed = latest_instance['completed']
+
+    if max_due_at >= now and not completed:
+        return True
+
+    return False, None
 
 def should_create_task_instance(
     latest_instance: asyncpg.Record | None,
@@ -119,7 +137,7 @@ def should_create_task_instance(
         return True, None
 
     if max_due_at >= now and not completed:
-        return True, max_due_at
+        return False, max_due_at
 
     return False, None
 
@@ -153,7 +171,7 @@ def build_task_message(record: asyncpg.Record, due_at: datetime, now: datetime) 
     )
 
 
-async def schedule_tasks_for_managers(db_pool: asyncpg.Pool, bot: Bot):
+async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
     """Create and send effective task instances to active managers."""
     async with db_pool.acquire() as conn:
         active_templates = await fetch_active_templates_with_managers(conn)
@@ -169,22 +187,31 @@ async def schedule_tasks_for_managers(db_pool: asyncpg.Pool, bot: Bot):
             )
 
             should_create, due_at = should_create_task_instance(latest_instance, now)
-            if not should_create:
-                continue
+            should_notify_task = should_notify_task_instance(should_create, latest_instance, now)
+            if should_create:
+                if due_at is None:
+                    due_at = compute_next_due_at(record['frequency'], now)
+                    if due_at is None:
+                        continue
 
-            if due_at is None:
-                due_at = compute_next_due_at(record['frequency'], now)
-            if due_at is None:
-                continue
+                task_instance = await create_scheduled_task_instance(
+                    conn,
+                    record,
+                    due_at,
+                    scheduled_date,
+                )
+                tasks_to_notify.append((record, due_at, task_instance["id"]))
+            elif should_notify_task:
+                print(
+                    f"latest_instance for template={record['template_id']} manager={record['manager_id']}: {latest_instance!r}"
+                )
+                if latest_instance is None or 'id' not in latest_instance:
+                    print(
+                        f"Skipping notify because latest_instance has no id: {latest_instance!r}"
+                    )
+                    continue
 
-            task_instance = await create_scheduled_task_instance(
-                conn,
-                record,
-                due_at,
-                scheduled_date,
-            )
-            tasks_to_notify.append((record, due_at, task_instance["id"]))
-
+                tasks_to_notify.append((record, due_at, latest_instance["id"]))
         for record, due_at, task_instance_id in tasks_to_notify:
             try:
                 await bot.send_message(

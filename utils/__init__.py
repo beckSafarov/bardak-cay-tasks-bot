@@ -13,5 +13,5 @@ from .tasks import (
     mark_task_instance_completed,
     mark_task_instance_incomplete,
 )
-from .scheduler import get_tasks_to_create
+from .set_and_send_checklist import get_tasks_to_create
 from .keyboards import build_status_update_keyboard

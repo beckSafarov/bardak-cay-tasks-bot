@@ -1,13 +1,13 @@
 import logging
+from sched import scheduler
 from aiogram import Bot, Router, types
 from aiogram.filters import Command
 from utils.managers import (
     fetch_manager_by_telegram_id,
 )
-from utils.scheduler import schedule_tasks_for_managers
+from utils.set_and_send_checklist import set_and_send_checklists
 from utils.managers import (
     fetch_manager_by_telegram_id,
-    fetch_task_instances_by_manager_today,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -28,16 +28,6 @@ async def require_manager(message: types.Message, db_pool):
     return manager
 
 
-def format_task_list(tasks):
-    if not tasks:
-        return "You have no pending tasks for today! Well done. 🎉"
-
-    lines = [
-        f"🔹 {task['title']} (Due: {task['due_at'] or 'unspecified'})" for task in tasks
-    ]
-    return "Your tasks for today:\n\n" + "\n".join(lines)
-
-
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, db_pool, bot: Bot):
     """Handle /start command and schedule tasks for registered managers."""
@@ -54,23 +44,19 @@ async def cmd_start(message: types.Message, db_pool, bot: Bot):
         )
         return
 
-    await schedule_tasks_for_managers(db_pool, bot)
     await message.answer(
         f"Welcome back, {manager['full_name']}! 👋\n"
         "Use the menu below to manage your restaurant tasks."
     )
-    # Here you would typically show a main menu keyboard
 
 
 @router.message(Command("tasks"))
-async def cmd_tasks(message: types.Message, db_pool):
+async def cmd_tasks(message: types.Message, db_pool, bot: Bot):
     """List pending tasks for the manager."""
 
     manager = await require_manager(message, db_pool)
     if not manager:
         return
 
-    async with db_pool.acquire() as conn:
-        tasks = await fetch_task_instances_by_manager_today(conn, manager["id"])
-
-    await message.answer(format_task_list(tasks))
+    await message.answer("Fetching your tasks for today... ⏳")
+    await set_and_send_checklists(db_pool, bot)
