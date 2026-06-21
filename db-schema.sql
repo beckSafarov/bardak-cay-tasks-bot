@@ -24,6 +24,7 @@ CREATE TABLE public.managers (
   telegram_id bigint UNIQUE,
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
+  phone_number character varying,
   CONSTRAINT managers_pkey PRIMARY KEY (id),
   CONSTRAINT managers_restaurant_id_fkey FOREIGN KEY (restaurant_id) REFERENCES public.restaurants(id),
   CONSTRAINT managers_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id)

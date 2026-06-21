@@ -2,6 +2,16 @@ from datetime import date
 
 import asyncpg
 
+
+async def fetch_manager_by_phone(conn: asyncpg.Connection, phone_number: str):
+    """Fetch an active manager record using their phone number."""
+    return await conn.fetchrow(
+        "SELECT id, full_name, restaurant_id, branch_id FROM managers "
+        "WHERE phone_number = $1 AND is_active = true",
+        phone_number,
+    )
+
+
 async def fetch_manager_by_telegram_id(conn: asyncpg.Connection, telegram_id: int):
     """Fetch an active manager record using their Telegram user ID."""
     return await conn.fetchrow(

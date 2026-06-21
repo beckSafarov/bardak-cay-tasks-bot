@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
-
 def parse_mark_status_payload(callback_data: str) -> Optional[int]:
     parts = callback_data.split(":", 1)
     if len(parts) != 2 or not parts[1].isdigit():

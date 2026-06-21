@@ -1,6 +1,7 @@
 from .db import create_db_pool
 from .managers import (
     fetch_manager_by_telegram_id,
+    fetch_manager_by_phone,
     fetch_pending_tasks_for_manager,
     fetch_task_instances_by_manager_today,
 )
