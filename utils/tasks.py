@@ -63,6 +63,17 @@ async def create_task_instance(
     )
 
 
+async def fetch_task_instance(
+    conn: asyncpg.Connection,
+    task_instance_id: int,
+) -> asyncpg.Record:
+    """Fetch a specific task instance by ID."""
+    return await conn.fetchrow(
+        "SELECT * FROM task_instances WHERE id = $1",
+        task_instance_id,
+    )
+
+
 async def mark_task_instance_incomplete(
     conn: asyncpg.Connection,
     task_instance_id: int,

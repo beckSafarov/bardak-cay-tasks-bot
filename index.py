@@ -25,8 +25,8 @@ async def on_startup(bot: Bot, db_pool):
         set_and_send_checklists,
         "cron",
         args=(db_pool, bot),
-        hour=12,
-        minute=23,
+        hour=16,
+        minute=00,
         id="daily_checklist_job",
         replace_existing=True,
     )
