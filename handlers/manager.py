@@ -1,14 +1,17 @@
 import logging
 from sched import scheduler
-from aiogram import Bot, Router, types
+from aiogram import Bot, Router, types, F
 from aiogram.filters import Command
 from utils.managers import (
+    fetch_manager_by_phone,
     fetch_manager_by_telegram_id,
 )
 from utils.set_and_send_checklist import set_and_send_checklists
 from utils.managers import (
     fetch_manager_by_telegram_id,
+    set_manager_telegram_id_by_phone,
 )
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,22 +35,58 @@ async def require_manager(message: types.Message, db_pool):
 async def cmd_start(message: types.Message, db_pool, bot: Bot):
     """Handle /start command and schedule tasks for registered managers."""
 
-    manager = await fetch_manager(message, db_pool)
+    # Create a keyboard builder
+    builder = ReplyKeyboardBuilder()
 
-    if not manager:
+    # Add a special button that securely requests their contact info
+    builder.button(text="📱 Share Phone Number to Authenticate", request_contact=True)
+
+    await message.answer(
+        "Welcome to the Restaurant Task Management Bot!\n\n"
+        "To access your tasks, we need to verify your identity. "
+        "Please click the button below to share your phone number.",
+        reply_markup=builder.as_markup(resize_keyboard=True, one_time_keyboard=True),
+    )
+
+
+@router.message(F.contact)
+async def handle_contact(message: types.Message, db_pool):
+    """
+    Receive the secure phone number from Telegram and authenticate the manager.
+    """
+    contact = message.contact
+
+    # Security Check: Ensure the shared contact actually belongs to the user clicking the button
+    if contact.user_id != message.from_user.id:
         await message.answer(
-            "Welcome to the Restaurant Task Bot! 📋\n\n"
-            "It looks like you are not registered as an active manager. "
-            "Please contact your administrator with your Telegram ID: "
-            f"<code>{message.from_user.id}</code>",
-            parse_mode="HTML",
+            "❌ Authentication failed. You must share your own phone number.",
+            reply_markup=types.ReplyKeyboardRemove(),  # Clears the button
         )
         return
 
-    await message.answer(
-        f"Welcome back, {manager['full_name']}! 👋\n"
-        "Use the menu below to manage your restaurant tasks."
-    )
+    # Clean the phone number (Telegram usually sends it with a leading '+' or country code)
+    phone_number = contact.phone_number.strip().replace("+", "")
+
+    # Look up the manager in your database by phone number
+    manager = await fetch_manager_by_phone(db_pool, phone_number)
+
+    if manager:
+        # Optional: Save their telegram_id to the database now so you can push scheduled tasks to them later
+        await set_manager_telegram_id_by_phone(
+            db_pool, phone_number, message.from_user.id
+        )
+
+        await message.answer(
+            f"✅ Authentication Successful! Welcome back, Manager {manager['full_name']}.\n"
+            "Use /tasks to see your pending layout for today.",
+            reply_markup=types.ReplyKeyboardRemove(),  # Successfully removes the share button
+        )
+    else:
+        await message.answer(
+            "❌ Access Denied. This phone number is not registered as an active manager in our system. "
+            "Please contact system administration.",
+            reply_markup=types.ReplyKeyboardRemove(),
+        )
 
 
 @router.message(Command("tasks"))

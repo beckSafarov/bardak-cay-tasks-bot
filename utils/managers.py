@@ -12,6 +12,19 @@ async def fetch_manager_by_phone(conn: asyncpg.Connection, phone_number: str):
     )
 
 
+async def set_manager_telegram_id_by_phone(
+    conn: asyncpg.Connection,
+    phone_number: str,
+    telegram_id: int,
+) -> None:
+    """Set the Telegram ID for a manager based on their phone number."""
+    await conn.execute(
+        "UPDATE managers SET telegram_id = $1 WHERE phone_number = $2",
+        telegram_id,
+        phone_number,
+    )
+
+
 async def fetch_manager_by_telegram_id(conn: asyncpg.Connection, telegram_id: int):
     """Fetch an active manager record using their Telegram user ID."""
     return await conn.fetchrow(

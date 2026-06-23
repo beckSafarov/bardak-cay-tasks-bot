@@ -105,19 +105,23 @@ def should_notify_task_instance(
     should_create_task_instance: bool,
     latest_instance: asyncpg.Record | None,
     now: datetime,
-) -> tuple[bool]:
+) -> bool:
     """Decide whether the task instance should be notified."""
-    
+
     if should_create_task_instance:
         return True
+
+    if latest_instance is None:
+        return False
 
     max_due_at = latest_instance['due_at']
     completed = latest_instance['completed']
 
-    if max_due_at >= now and not completed:
-        return True
+    if max_due_at is None:
+        return False
 
-    return False, None
+    return max_due_at >= now and not completed
+
 
 def should_create_task_instance(
     latest_instance: asyncpg.Record | None,
@@ -166,7 +170,7 @@ def build_task_message(record: asyncpg.Record, due_at: datetime, now: datetime) 
     relative_due = format_due_at_relative(due_at, now)
     return (
         f"☑️ Task title: {record['title']}\n"
-        f"📃 Description: {description}\n"
+        # f"📃 Description: {description}\n"
         f"⏰ Due at: {relative_due}"
     )
 
@@ -211,7 +215,15 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
                     )
                     continue
 
+                if due_at is None:
+                    print(
+                        f"Skipping notify because due_at is missing for template={record['template_id']} manager={record['manager_id']}"
+                    )
+                    continue
+
                 tasks_to_notify.append((record, due_at, latest_instance["id"]))
+        tasks_to_notify.sort(key=lambda x: x[1] or datetime.max)  # Sort by due_at
+
         for record, due_at, task_instance_id in tasks_to_notify:
             try:
                 await bot.send_message(
@@ -223,3 +235,9 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
                 )
             except Exception as exc:
                 print(f"Failed to send message to {record['telegram_id']}: {exc}")
+        if len(tasks_to_notify) == 0:
+            await bot.send_message(
+                record["telegram_id"],
+                "No tasks found for today's date!",
+            )
+            print("No tasks found for today's date!")
