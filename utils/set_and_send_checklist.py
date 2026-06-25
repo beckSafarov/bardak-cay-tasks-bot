@@ -59,10 +59,9 @@ async def get_tasks_to_create(conn):
     }
 
 
-async def fetch_active_templates_with_managers(conn: asyncpg.Connection):
-    """Fetch active task templates joined to active managers."""
-    return await conn.fetch(
-        """
+async def fetch_active_templates_with_personnel(conn: asyncpg.Connection):
+    """Fetch active task templates joined to active personnel."""
+    return await conn.fetch("""
         SELECT
             tt.id AS template_id,
             tt.restaurant_id,
@@ -70,34 +69,34 @@ async def fetch_active_templates_with_managers(conn: asyncpg.Connection):
             tt.title,
             tt.description,
             tt.frequency,
-            m.id AS manager_id,
-            m.telegram_id
+            p.id AS personnel_id,
+            p.telegram_id
         FROM task_templates tt
-        JOIN managers m
-          ON tt.branch_id = m.branch_id
-         AND tt.restaurant_id = m.restaurant_id
+        JOIN personnel p
+          ON tt.branch_id = p.branch_id
+         AND tt.restaurant_id = p.restaurant_id
         WHERE tt.is_active = true
-          AND m.is_active = true
-        """
-    )
+          AND p.is_active = true
+        """)
 
 
 async def fetch_latest_task_instance(
     conn: asyncpg.Connection,
     template_id: int,
-    manager_id: int,
+    personnel_id: int,
 ):
-    """Fetch the most recent task instance for a given template and manager."""
+    """Fetch the most recent task instance for a given template and personnel."""
+
     return await conn.fetchrow(
         """
         SELECT id, due_at, completed
         FROM task_instances
-        WHERE template_id = $1 AND manager_id = $2
+        WHERE template_id = $1 AND personnel_id = $2
         ORDER BY due_at DESC NULLS LAST
         LIMIT 1
         """,
         template_id,
-        manager_id,
+        personnel_id,
     )
 
 
@@ -152,12 +151,13 @@ async def create_scheduled_task_instance(
     due_at: datetime,
     scheduled_date: datetime.date,
 ) -> asyncpg.Record:
-    """Insert and return a new task instance for the resolved template/manager pair."""
+    """Insert and return a new task instance for the resolved template/personnel pair."""
+
     return await create_task_instance(
         conn,
         record["restaurant_id"],
         record["branch_id"],
-        record["manager_id"],
+        record["personnel_id"],
         record["template_id"],
         scheduled_date,
         due_at,
@@ -165,8 +165,9 @@ async def create_scheduled_task_instance(
 
 
 def build_task_message(record: asyncpg.Record, due_at: datetime, now: datetime) -> str:
-    """Build the message text for the manager."""
-    description = record['description'] or 'No description'
+    """Build the message text for the personnel."""
+
+    # description = record['description'] or 'No description'
     relative_due = format_due_at_relative(due_at, now)
     return (
         f"☑️ Task title: {record['title']}\n"
@@ -176,9 +177,10 @@ def build_task_message(record: asyncpg.Record, due_at: datetime, now: datetime) 
 
 
 async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
-    """Create and send effective task instances to active managers."""
+    """Create and send effective task instances to active personnel."""
+
     async with db_pool.acquire() as conn:
-        active_templates = await fetch_active_templates_with_managers(conn)
+        active_templates = await fetch_active_templates_with_personnel(conn)
         now = datetime.now(timezone.utc)
         scheduled_date = now.date()
         tasks_to_notify = []
@@ -186,8 +188,8 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
         for record in active_templates:
             latest_instance = await fetch_latest_task_instance(
                 conn,
-                record['template_id'],
-                record['manager_id'],
+                record["template_id"],
+                record["personnel_id"],
             )
 
             should_create, due_at = should_create_task_instance(latest_instance, now)
@@ -207,7 +209,7 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
                 tasks_to_notify.append((record, due_at, task_instance["id"]))
             elif should_notify_task:
                 print(
-                    f"latest_instance for template={record['template_id']} manager={record['manager_id']}: {latest_instance!r}"
+                    f"latest_instance for template={record['template_id']} personnel={record['personnel_id']}: {latest_instance!r}"
                 )
                 if latest_instance is None or 'id' not in latest_instance:
                     print(
@@ -217,7 +219,7 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
 
                 if due_at is None:
                     print(
-                        f"Skipping notify because due_at is missing for template={record['template_id']} manager={record['manager_id']}"
+                        f"Skipping notify because due_at is missing for template={record['template_id']} personnel={record['personnel_id']}"
                     )
                     continue
 

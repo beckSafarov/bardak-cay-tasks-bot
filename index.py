@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from aiogram import Bot, Dispatcher, Router
 from aiogram.fsm.storage.memory import MemoryStorage
 from utils.db import TELEGRAM_BOT_TOKEN, create_db_pool
-from handlers.manager import router as manager_router
+from handlers.start import router as start_router
 from handlers.task_status import router as task_status_router
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from utils.set_and_send_checklist import set_and_send_checklists
@@ -42,7 +42,7 @@ async def main():
     dp = Dispatcher(storage=MemoryStorage())
     dp["db_pool"] = db_pool
     dp.startup.register(on_startup)
-    dp.include_router(manager_router)
+    dp.include_router(start_router)
     dp.include_router(task_status_router)
 
     try:

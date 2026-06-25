@@ -2,14 +2,14 @@ import logging
 from sched import scheduler
 from aiogram import Bot, Router, types, F
 from aiogram.filters import Command
-from utils.managers import (
-    fetch_manager_by_phone,
-    fetch_manager_by_telegram_id,
+from utils.personnel import (
+    fetch_personnel_by_phone,
+    fetch_personnel_by_telegram_id,
 )
 from utils.set_and_send_checklist import set_and_send_checklists
-from utils.managers import (
-    fetch_manager_by_telegram_id,
-    set_manager_telegram_id_by_phone,
+from utils.personnel import (
+    fetch_personnel_by_telegram_id,
+    set_personnel_telegram_id_by_phone,
 )
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
@@ -19,21 +19,21 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 
-async def fetch_manager(message: types.Message, db_pool):
+async def fetch_personnel(message: types.Message, db_pool):
     async with db_pool.acquire() as conn:
-        return await fetch_manager_by_telegram_id(conn, message.from_user.id)
+        return await fetch_personnel_by_telegram_id(conn, message.from_user.id)
 
 
-async def require_manager(message: types.Message, db_pool):
-    manager = await fetch_manager(message, db_pool)
-    if not manager:
-        await message.answer("Access denied. Manager not found.")
-    return manager
+async def require_personnel(message: types.Message, db_pool):
+    personnel = await fetch_personnel(message, db_pool)
+    if not personnel:
+        await message.answer("Access denied. Personnel not found.")
+    return personnel
 
 
 @router.message(Command("start"))
 async def cmd_start(message: types.Message, db_pool, bot: Bot):
-    """Handle /start command and schedule tasks for registered managers."""
+    """Handle /start command and schedule tasks for registered personnel."""
 
     # Create a keyboard builder
     builder = ReplyKeyboardBuilder()
@@ -67,23 +67,23 @@ async def handle_contact(message: types.Message, db_pool):
     # Clean the phone number (Telegram usually sends it with a leading '+' or country code)
     phone_number = contact.phone_number.strip().replace("+", "")
 
-    # Look up the manager in your database by phone number
-    manager = await fetch_manager_by_phone(db_pool, phone_number)
+    # Look up the personnel in your database by phone number
+    personnel = await fetch_personnel_by_phone(db_pool, phone_number)
 
-    if manager:
+    if personnel:
         # Optional: Save their telegram_id to the database now so you can push scheduled tasks to them later
-        await set_manager_telegram_id_by_phone(
+        await set_personnel_telegram_id_by_phone(
             db_pool, phone_number, message.from_user.id
         )
 
         await message.answer(
-            f"✅ Authentication Successful! Welcome back, Manager {manager['full_name']}.\n"
+            f"✅ Authentication Successful! Welcome back {personnel['full_name']}.\n"
             "Use /tasks to see your pending layout for today.",
             reply_markup=types.ReplyKeyboardRemove(),  # Successfully removes the share button
         )
     else:
         await message.answer(
-            "❌ Access Denied. This phone number is not registered as an active manager in our system. "
+            "❌ Access Denied. This phone number is not registered as an active personnel in our system. "
             "Please contact system administration.",
             reply_markup=types.ReplyKeyboardRemove(),
         )
@@ -91,10 +91,10 @@ async def handle_contact(message: types.Message, db_pool):
 
 @router.message(Command("tasks"))
 async def cmd_tasks(message: types.Message, db_pool, bot: Bot):
-    """List pending tasks for the manager."""
+    """List pending tasks for the personnel."""
 
-    manager = await require_manager(message, db_pool)
-    if not manager:
+    personnel = await require_personnel(message, db_pool)
+    if not personnel:
         return
 
     await message.answer("Fetching your tasks for today... ⏳")

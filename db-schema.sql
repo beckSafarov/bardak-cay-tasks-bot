@@ -16,7 +16,7 @@ CREATE TABLE public.branches (
   CONSTRAINT branches_pkey PRIMARY KEY (id),
   CONSTRAINT branches_restaurant_id_fkey FOREIGN KEY (restaurant_id) REFERENCES public.restaurants(id)
 );
-CREATE TABLE public.managers (
+CREATE TABLE public.personnel (
   id integer NOT NULL DEFAULT nextval('managers_id_seq'::regclass),
   restaurant_id integer NOT NULL,
   branch_id integer NOT NULL,
@@ -25,7 +25,8 @@ CREATE TABLE public.managers (
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
   phone_number character varying,
-  CONSTRAINT managers_pkey PRIMARY KEY (id),
+  role_name text NOT NULL DEFAULT 'manager'::text,
+  CONSTRAINT personnel_pkey PRIMARY KEY (id),
   CONSTRAINT managers_restaurant_id_fkey FOREIGN KEY (restaurant_id) REFERENCES public.restaurants(id),
   CONSTRAINT managers_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id)
 );
@@ -39,14 +40,16 @@ CREATE TABLE public.task_templates (
   due_time time without time zone,
   is_active boolean DEFAULT true,
   created_at timestamp with time zone DEFAULT now(),
+  personnel_id integer,
   CONSTRAINT task_templates_pkey PRIMARY KEY (id),
   CONSTRAINT task_templates_restaurant_id_fkey FOREIGN KEY (restaurant_id) REFERENCES public.restaurants(id),
-  CONSTRAINT task_templates_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id)
+  CONSTRAINT task_templates_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id),
+  CONSTRAINT task_templates_personnel_id_fkey FOREIGN KEY (personnel_id) REFERENCES public.personnel(id)
 );
 CREATE TABLE public.task_instances (
   id integer NOT NULL DEFAULT nextval('task_instances_id_seq'::regclass),
   template_id integer NOT NULL,
-  manager_id integer NOT NULL,
+  personnel_id integer NOT NULL,
   restaurant_id integer NOT NULL,
   branch_id integer NOT NULL,
   scheduled_date date NOT NULL,
@@ -57,13 +60,13 @@ CREATE TABLE public.task_instances (
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT task_instances_pkey PRIMARY KEY (id),
   CONSTRAINT task_instances_template_id_fkey FOREIGN KEY (template_id) REFERENCES public.task_templates(id),
-  CONSTRAINT task_instances_manager_id_fkey FOREIGN KEY (manager_id) REFERENCES public.managers(id),
   CONSTRAINT task_instances_restaurant_id_fkey FOREIGN KEY (restaurant_id) REFERENCES public.restaurants(id),
-  CONSTRAINT task_instances_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id)
+  CONSTRAINT task_instances_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id),
+  CONSTRAINT task_instances_personnel_id_fkey FOREIGN KEY (personnel_id) REFERENCES public.personnel(id)
 );
 CREATE TABLE public.kpi_summaries (
   id integer NOT NULL DEFAULT nextval('kpi_summaries_id_seq'::regclass),
-  manager_id integer NOT NULL,
+  personnel_id integer NOT NULL,
   restaurant_id integer NOT NULL,
   branch_id integer NOT NULL,
   period_type character varying NOT NULL CHECK (period_type::text = ANY (ARRAY['daily'::character varying, 'weekly'::character varying, 'monthly'::character varying]::text[])),
@@ -74,7 +77,7 @@ CREATE TABLE public.kpi_summaries (
   completion_rate numeric,
   calculated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT kpi_summaries_pkey PRIMARY KEY (id),
-  CONSTRAINT kpi_summaries_manager_id_fkey FOREIGN KEY (manager_id) REFERENCES public.managers(id),
   CONSTRAINT kpi_summaries_restaurant_id_fkey FOREIGN KEY (restaurant_id) REFERENCES public.restaurants(id),
-  CONSTRAINT kpi_summaries_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id)
+  CONSTRAINT kpi_summaries_branch_id_fkey FOREIGN KEY (branch_id) REFERENCES public.branches(id),
+  CONSTRAINT kpi_summaries_personnel_id_fkey FOREIGN KEY (personnel_id) REFERENCES public.personnel(id)
 );
