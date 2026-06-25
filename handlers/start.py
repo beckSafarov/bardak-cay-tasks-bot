@@ -1,7 +1,9 @@
+from datetime import date
 import logging
 from sched import scheduler
 from aiogram import Bot, Router, types, F
 from aiogram.filters import Command
+from aiogram.enums import ParseMode  # Ensure this import is present
 from utils.personnel import (
     fetch_personnel_by_phone,
     fetch_personnel_by_telegram_id,
@@ -12,6 +14,7 @@ from utils.personnel import (
     set_personnel_telegram_id_by_phone,
 )
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from utils.stats import fetch_task_statistics
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -99,3 +102,53 @@ async def cmd_tasks(message: types.Message, db_pool, bot: Bot):
 
     await message.answer("Fetching your tasks for today... ⏳")
     await set_and_send_checklists(db_pool, bot)
+
+
+@router.message(Command("stats"))
+async def cmd_stats(message: types.Message, db_pool, bot: Bot):
+    """List task statistics for the personnel as a clean Markdown table."""
+
+    personnel = await require_personnel(message, db_pool)
+    if not personnel:
+        return
+
+    # 1. Fetch data
+    stats = await fetch_task_statistics(
+        db_pool, personnel["id"], date.today().month, date.today().year
+    )
+
+    if not stats:
+        await message.answer("No statistics found for this month yet! 📊")
+        return
+
+    # 2. Build the Markdown table headers
+    # We use left-aligned strings with fixed widths for a structured look
+    table_lines = [
+        "```",  # Start monospaced code block
+        f"{'Task Title':<16} | {'Tot':<3} | {'Cmp':<3} | {'%':<4}",
+        "-" * 35,  # Divider line
+    ]
+
+    # 3. Populate rows dynamically
+    for stat in stats:
+        # Truncate long titles to keep the table structure rigid and clean
+        title = (
+            stat["task_title"][:14] + ".."
+            if len(stat["task_title"]) > 16
+            else stat["task_title"]
+        )
+        tot = stat["total_instances"]
+        cmp = stat["completed_tasks"]
+        pct = f"{int(stat['completion_percentage'])}%"
+
+        table_lines.append(f"{title:<16} | {tot:<3} | {cmp:<3} | {pct:<4}")
+
+    table_lines.append("```")  # End monospaced code block
+
+    # 4. Join lines and send as a single message
+    final_message = "\n".join(table_lines)
+
+    await message.answer(
+        f"📊 *Your Task Stats This Month:*\n\n{final_message}",
+        parse_mode=ParseMode.MARKDOWN_V2,
+    )
