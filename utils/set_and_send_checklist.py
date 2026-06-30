@@ -31,19 +31,23 @@ def compute_next_due_at(frequency: str, now: datetime) -> datetime | None:
     """Compute the next due date based on frequency."""
     if frequency == 'daily':
         next_day = now + timedelta(days=1)
-        return datetime(next_day.year, next_day.month, next_day.day, 2, 0, tzinfo=timezone.utc)
+        return datetime(
+            next_day.year, next_day.month, next_day.day, 3, 0, tzinfo=timezone.utc
+        )
 
     if frequency == 'weekly':
         days_ahead = 7 - now.weekday()
         if days_ahead == 0:
             days_ahead = 7
         next_week = now + timedelta(days=days_ahead)
-        return datetime(next_week.year, next_week.month, next_week.day, 2, 0, tzinfo=timezone.utc)
+        return datetime(
+            next_week.year, next_week.month, next_week.day, 3, 0, tzinfo=timezone.utc
+        )
 
     if frequency == 'monthly':
         if now.month == 12:
-            return datetime(now.year + 1, 1, 1, 2, 0, tzinfo=timezone.utc)
-        return datetime(now.year, now.month + 1, 1, 2, 0, tzinfo=timezone.utc)
+            return datetime(now.year + 1, 1, 1, 3, 0, tzinfo=timezone.utc)
+        return datetime(now.year, now.month + 1, 1, 3, 0, tzinfo=timezone.utc)
 
     return None
 
@@ -89,10 +93,11 @@ async def fetch_latest_task_instance(
 
     return await conn.fetchrow(
         """
-        SELECT id, due_at, completed
-        FROM task_instances
-        WHERE template_id = $1 AND personnel_id = $2
-        ORDER BY due_at DESC NULLS LAST
+        SELECT tt.title, ti.id, ti.due_at, ti.completed
+        FROM task_instances ti
+        join task_templates tt on ti.template_id = tt.id
+        WHERE tt.id = $1 AND ti.personnel_id = $2
+        ORDER BY ti.due_at DESC NULLS LAST
         LIMIT 1
         """,
         template_id,
@@ -164,15 +169,18 @@ async def create_scheduled_task_instance(
     )
 
 
-def build_task_message(record: asyncpg.Record, due_at: datetime, now: datetime) -> str:
+def build_task_message(
+    record: asyncpg.Record, due_at: datetime, now: datetime, task_instance_id: int
+) -> str:
     """Build the message text for the personnel."""
 
-    # description = record['description'] or 'No description'
+    task_title = record["title"] or "No title"
+    task_type = record.get("description", "umumiy")
     relative_due = format_due_at_relative(due_at, now)
+
     return (
-        f"☑️ Task title: {record['title']}\n"
-        # f"📃 Description: {description}\n"
-        f"⏰ Due at: {relative_due}"
+        f"`# {task_instance_id} | {task_type} | Due {relative_due}`\n\n"
+        f"**📋 {task_title}**"
     )
 
 
@@ -223,17 +231,20 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
                     )
                     continue
 
-                tasks_to_notify.append((record, due_at, latest_instance["id"]))
+                tasks_to_notify.append(
+                    (record, due_at, latest_instance["id"], latest_instance["title"])
+                )
         tasks_to_notify.sort(key=lambda x: x[1] or datetime.max)  # Sort by due_at
 
-        for record, due_at, task_instance_id in tasks_to_notify:
+        for record, due_at, task_instance_id, task_instance_title in tasks_to_notify:
             try:
                 await bot.send_message(
                     record["telegram_id"],
-                    build_task_message(record, due_at, now),
+                    build_task_message(record, due_at, now, task_instance_id),
                     reply_markup=build_status_update_keyboard(
-                        task_instance_id, is_done=False
+                        task_instance_id, task_instance_title, is_done=False
                     ),
+                    parse_mode="Markdown",
                 )
             except Exception as exc:
                 print(f"Failed to send message to {record['telegram_id']}: {exc}")

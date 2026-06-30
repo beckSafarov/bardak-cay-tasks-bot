@@ -15,6 +15,7 @@ from utils.personnel import (
 )
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from utils.stats import fetch_task_statistics
+from utils.index import get_trunc_text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -132,11 +133,12 @@ async def cmd_stats(message: types.Message, db_pool, bot: Bot):
     # 3. Populate rows dynamically
     for stat in stats:
         # Truncate long titles to keep the table structure rigid and clean
-        title = (
-            stat["task_title"][:14] + ".."
-            if len(stat["task_title"]) > 16
-            else stat["task_title"]
-        )
+        # title = (
+        #     stat["task_title"][:14] + ".."
+        #     if len(stat["task_title"]) > 16
+        #     else stat["task_title"]
+        # )
+        title = get_trunc_text(stat["task_title"], 16)
         tot = stat["total_instances"]
         cmp = stat["completed_tasks"]
         pct = f"{int(stat['completion_percentage'])}%"

@@ -3,10 +3,12 @@ import logging
 import re
 from datetime import datetime, timezone
 from typing import Optional
-from aiogram import Router, types
+from aiogram import F, Router, types
+from aiogram.fsm.state import State, StatesGroup
 from utils.tasks import (
     mark_task_instance_completed,
     mark_task_instance_incomplete,
+    add_note_to_task_instance,
     fetch_task_instance,
 )
 from utils.keyboards import build_status_update_keyboard
@@ -16,6 +18,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = Router()
+
+
+class TaskForm(StatesGroup):
+    waiting_for_note = State()
 
 
 def parse_mark_status_payload(callback_data: str) -> Optional[int]:
@@ -123,3 +129,54 @@ async def on_mark_undone(callback: types.CallbackQuery, db_pool):
         pass
 
     await callback.answer("Task marked incomplete ❌")
+
+
+from aiogram import Router, types
+from aiogram.fsm.context import FSMContext
+
+router = Router()
+
+
+@router.callback_query(F.data.startswith("add_note:"))
+async def handle_add_note_click(callback: types.CallbackQuery, state: FSMContext):
+    # 1. Extract the task instance ID from the callback data
+    task_instance_id = int(callback.data.split(":")[1])
+    task_instance_title = callback.data.split(":")[2]
+
+    # 2. Set the current user's state to waiting_for_note
+    await state.set_state(TaskForm.waiting_for_note)
+
+    # 3. Store the task_instance_id in FSM context so we don't lose it
+    await state.update_data(current_task_id=task_instance_id)
+
+    # 4. Notify the user to type their text
+    await callback.message.answer(
+        f"📝 Please type and send your note for this task  ({task_instance_id}. {task_instance_title}):"
+    )
+
+    # 5. Acknowledge the callback click so the loading wheel stops spinning
+    await callback.answer()
+
+
+@router.message(TaskForm.waiting_for_note)
+async def process_note_text_input(message: types.Message, state: FSMContext, db_pool):
+    # 1. Get the text the user sent as their note
+    note_text = message.text.strip()
+
+    if not note_text:
+        await message.answer("⚠️ Note cannot be empty. Please type something.")
+        return
+
+    # 2. Retrieve the task ID we saved earlier in Step 2
+    user_data = await state.get_data()
+    task_instance_id = user_data.get("current_task_id")
+    # task_title = user_data.get("current_task_title")
+
+    # 3. Update your database with the note
+    await add_note_to_task_instance(db_pool, note_text, task_instance_id)
+
+    # 4. Confirm to the user that it was saved successfully
+    await message.answer(f"✅ Note successfully added to Task #{task_instance_id}!")
+
+    # 5. CRITICAL: Clear the state so they can use normal bot commands again
+    await state.clear()

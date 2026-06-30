@@ -105,3 +105,20 @@ async def mark_task_instance_completed(
         """,
         task_instance_id,
     )
+
+
+async def add_note_to_task_instance(
+    conn: asyncpg.Connection,
+    note: str,
+    task_instance_id: int,
+) -> str:
+    """Mark a task instance as incomplete."""
+    return await conn.execute(
+        """
+        UPDATE task_instances
+        SET note = $1
+        WHERE id = $2
+        """,
+        note,
+        task_instance_id,
+    )
