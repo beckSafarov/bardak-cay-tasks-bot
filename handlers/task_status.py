@@ -12,12 +12,13 @@ from utils.tasks import (
     fetch_task_instance,
 )
 from utils.keyboards import build_status_update_keyboard
+from utils.index import get_labels
 from zoneinfo import ZoneInfo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 router = Router()
+labels = get_labels().get("task_status", {})
 
 
 class TaskForm(StatesGroup):
@@ -61,12 +62,12 @@ async def unstrike_message_text(message: types.Message, task_instance_id: int = 
 async def on_mark_done(callback: types.CallbackQuery, db_pool):
     """Handle inline keyboard callback to mark a task instance completed."""
     if callback.data is None or callback.message is None:
-        await callback.answer("Unable to mark task as done.", show_alert=True)
+        await callback.answer(labels["unable_to_mark_done"], show_alert=True)
         return
 
     task_instance_id = parse_mark_status_payload(callback.data)
     if task_instance_id is None:
-        await callback.answer("Invalid action.", show_alert=True)
+        await callback.answer(labels["invalid_action"], show_alert=True)
         return
 
     async with db_pool.acquire() as conn:
@@ -76,7 +77,7 @@ async def on_mark_done(callback: types.CallbackQuery, db_pool):
         due_at_local = task_instance["due_at"].astimezone(now.tzinfo)
         if due_at_local < now:
             await callback.answer(
-                "Cannot mark overdue task as complete", show_alert=True
+                labels["cannot_mark_overdue_complete"], show_alert=True
             )
             return
         else:
@@ -89,10 +90,13 @@ async def on_mark_done(callback: types.CallbackQuery, db_pool):
         print(
             f"Failed to strike message text for task_instance_id={task_instance_id}: {exc}"
         )
-        await callback.answer(f"Failed to mark task as done: {exc}", show_alert=True)
+        await callback.answer(
+            labels["failed_to_mark_done"].replace("<error>", str(exc)),
+            show_alert=True,
+        )
         pass
 
-    await callback.answer("Task marked done ✅")
+    await callback.answer(labels["task_marked_done"])
 
 
 @router.callback_query(
@@ -101,12 +105,12 @@ async def on_mark_done(callback: types.CallbackQuery, db_pool):
 async def on_mark_undone(callback: types.CallbackQuery, db_pool):
     """Handle inline keyboard callback to mark a task instance as incomplete."""
     if callback.data is None or callback.message is None:
-        await callback.answer("Unable to mark task as incomplete.", show_alert=True)
+        await callback.answer(labels["unable_to_mark_undone"], show_alert=True)
         return
 
     task_instance_id = parse_mark_status_payload(callback.data)
     if task_instance_id is None:
-        await callback.answer("Invalid action.", show_alert=True)
+        await callback.answer(labels["invalid_action"], show_alert=True)
         return
 
     async with db_pool.acquire() as conn:
@@ -116,7 +120,7 @@ async def on_mark_undone(callback: types.CallbackQuery, db_pool):
         due_at_local = task_instance["due_at"].astimezone(now.tzinfo)
         if due_at_local < now:
             await callback.answer(
-                "Cannot mark overdue task as incomplete", show_alert=True
+                labels["cannot_mark_overdue_incomplete"], show_alert=True
             )
             return
         else:
@@ -128,7 +132,7 @@ async def on_mark_undone(callback: types.CallbackQuery, db_pool):
     except Exception:
         pass
 
-    await callback.answer("Task marked incomplete ❌")
+    await callback.answer(labels["task_marked_undone"])
 
 
 from aiogram import Router, types
@@ -151,7 +155,9 @@ async def handle_add_note_click(callback: types.CallbackQuery, state: FSMContext
 
     # 4. Notify the user to type their text
     await callback.message.answer(
-        f"📝 Please type and send your note for this task  ({task_instance_id}. {task_instance_title}):"
+        labels["type_note_prompt"].replace(
+            "<task>", f"({task_instance_id}. {task_instance_title})"
+        )
     )
 
     # 5. Acknowledge the callback click so the loading wheel stops spinning
@@ -164,7 +170,7 @@ async def process_note_text_input(message: types.Message, state: FSMContext, db_
     note_text = message.text.strip()
 
     if not note_text:
-        await message.answer("⚠️ Note cannot be empty. Please type something.")
+        await message.answer(labels["note_cannot_be_empty"])
         return
 
     # 2. Retrieve the task ID we saved earlier in Step 2
@@ -176,7 +182,9 @@ async def process_note_text_input(message: types.Message, state: FSMContext, db_
     await add_note_to_task_instance(db_pool, note_text, task_instance_id)
 
     # 4. Confirm to the user that it was saved successfully
-    await message.answer(f"✅ Note successfully added to Task #{task_instance_id}!")
+    await message.answer(
+        labels["note_added"].replace("<task_id>", str(task_instance_id))
+    )
 
     # 5. CRITICAL: Clear the state so they can use normal bot commands again
     await state.clear()

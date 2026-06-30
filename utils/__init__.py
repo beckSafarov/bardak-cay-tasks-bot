@@ -16,4 +16,4 @@ from .tasks import (
 )
 from .set_and_send_checklist import get_tasks_to_create
 from .keyboards import build_status_update_keyboard
-from .index import get_trunc_text
+from .index import get_trunc_text, get_labels

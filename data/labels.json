@@ -1,0 +1,47 @@
+{
+  "main": {
+    "share_phone": "📱 Tasdiqlash uchun telefon raqamini yuborish",
+    "access_denied_personnel_not_found": "Kirish rad etildi. Xodim topilmadi.",
+    "welcome_message": [
+      "Bardak Chay topshiriqlarini boshqarish botiga xush kelibsiz!",
+      "Vazifalaringizni ko'rish uchun shaxsingizni tasdiqlashimiz kerak.",
+      "Telefon raqamingizni yuborish uchun quyidagi tugmani bosing."
+    ],
+    "auth_failed": "❌ Identifikatsiya muvaffaqiyatsiz tugadi. O'zingizning telefon raqamingizni yuborishingiz kerak.",
+    "auth_success": "✅ Identifikatsiya muvaffaqiyatli yakunlandi! Xush kelibsiz, <user>!",
+    "access_denied": "❌ Kirish rad etildi. Ushbu telefon raqami tizimimizda faol xodim sifatida ro'yxatga olinmagan. \nIltimos, tizim administratoriga murojaat qiling.",
+    "tasks_command_suggestion": "Bugungi vazifalar ro'yxatini ko'rish uchun /tasks buyrug'idan foydalaning.",
+    "fetching_tasks_today": "Bugungi vazifalaringiz yuklanmoqda... ⏳",
+    "no_stats_found": "Ushbu oy uchun hali statistika topilmadi! 📊",
+    "user_stats_this_month": "📊 *Shu oydagi vazifalaringiz statistikasi:*\n\n<final_message>",
+    "stats_table_header_title": "Vazifa nomi",
+    "stats_table_header_total": "Jami",
+    "stats_table_header_completed": "Baj.",
+    "stats_table_header_percentage": "%"
+  },
+  "task_status": {
+    "add_note": "Izoh qo'shish",
+    "mark_done": "Bajarildi deb belgilash",
+    "mark_undone": "Bajarilmadi deb belgilash",
+    "unable_to_mark_done": "Vazifani bajarildi deb belgilashning imkoni bo'lmadi.",
+    "invalid_action": "Noto'g'ri amal.",
+    "cannot_mark_overdue_complete": "Muddati o'tgan vazifani bajarildi deb belgilab bo'lmaydi.",
+    "cannot_mark_overdue_incomplete": "Muddati o'tgan vazifani bajarilmadi deb belgilab bo'lmaydi.",
+    "failed_to_mark_done": "Vazifani bajarildi deb belgilashda xatolik yuz berdi: <error>",
+    "task_marked_done": "Vazifa bajarildi deb belgilandi ✅",
+    "task_marked_undone": "Vazifa bajarilmagan deb belgilandi ❌",
+    "unable_to_mark_undone": "Vazifani bajarilmadi deb belgilashning imkoni bo'lmadi.",
+    "type_note_prompt": "📝 Marhamat ushbu vazifa uchun izohingizni yozib yuboring: <task>",
+    "note_cannot_be_empty": "⚠️ Izoh bo'sh bo'lishi mumkin emas. Iltimos, biror narsa yozing.",
+    "note_added": "✅ Izoh <task_id>-sonli vazifaga muvaffaqiyatli qo'shildi!"
+  },
+  "tasks_sending": {
+    "no_tasks_for_today": "Bugungi sana uchun vazifalar topilmadi!",
+    "due": "Muddat: <due_at>",
+    "today_at": "Bugun soat <due_at> da",
+    "tomorrow_at": "Ertaga soat <due_at> da",
+    "overdue_days": "<due_at> kundan keyin soat <due_time> da",
+    "no_title": "Nomsiz vazifa",
+    "default_task_type": "umumiy"
+  }
+}

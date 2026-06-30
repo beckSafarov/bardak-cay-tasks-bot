@@ -15,13 +15,13 @@ from utils.personnel import (
 )
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from utils.stats import fetch_task_statistics
-from utils.index import get_trunc_text
+from utils.index import get_trunc_text, get_labels
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = Router()
-
+labels = get_labels().get("main", {})
 
 async def fetch_personnel(message: types.Message, db_pool):
     async with db_pool.acquire() as conn:
@@ -31,7 +31,7 @@ async def fetch_personnel(message: types.Message, db_pool):
 async def require_personnel(message: types.Message, db_pool):
     personnel = await fetch_personnel(message, db_pool)
     if not personnel:
-        await message.answer("Access denied. Personnel not found.")
+        await message.answer(labels["access_denied_personnel_not_found"])
     return personnel
 
 
@@ -43,12 +43,12 @@ async def cmd_start(message: types.Message, db_pool, bot: Bot):
     builder = ReplyKeyboardBuilder()
 
     # Add a special button that securely requests their contact info
-    builder.button(text="📱 Share Phone Number to Authenticate", request_contact=True)
+    builder.button(text=labels["share_phone"], request_contact=True)
+
+    welcome_text = "\n".join(labels["welcome_message"])
 
     await message.answer(
-        "Welcome to the Restaurant Task Management Bot!\n\n"
-        "To access your tasks, we need to verify your identity. "
-        "Please click the button below to share your phone number.",
+        welcome_text,
         reply_markup=builder.as_markup(resize_keyboard=True, one_time_keyboard=True),
     )
 
@@ -63,7 +63,7 @@ async def handle_contact(message: types.Message, db_pool):
     # Security Check: Ensure the shared contact actually belongs to the user clicking the button
     if contact.user_id != message.from_user.id:
         await message.answer(
-            "❌ Authentication failed. You must share your own phone number.",
+            labels["auth_failed"],
             reply_markup=types.ReplyKeyboardRemove(),  # Clears the button
         )
         return
@@ -81,14 +81,14 @@ async def handle_contact(message: types.Message, db_pool):
         )
 
         await message.answer(
-            f"✅ Authentication Successful! Welcome back {personnel['full_name']}.\n"
-            "Use /tasks to see your pending layout for today.",
+            labels["auth_success"].replace("<user>", personnel["full_name"])
+            + "\n"
+            + labels["tasks_command_suggestion"],
             reply_markup=types.ReplyKeyboardRemove(),  # Successfully removes the share button
         )
     else:
         await message.answer(
-            "❌ Access Denied. This phone number is not registered as an active personnel in our system. "
-            "Please contact system administration.",
+            labels["access_denied"],
             reply_markup=types.ReplyKeyboardRemove(),
         )
 
@@ -101,7 +101,7 @@ async def cmd_tasks(message: types.Message, db_pool, bot: Bot):
     if not personnel:
         return
 
-    await message.answer("Fetching your tasks for today... ⏳")
+    await message.answer(labels["fetching_tasks_today"])
     await set_and_send_checklists(db_pool, bot)
 
 
@@ -119,14 +119,14 @@ async def cmd_stats(message: types.Message, db_pool, bot: Bot):
     )
 
     if not stats:
-        await message.answer("No statistics found for this month yet! 📊")
+        await message.answer(labels["no_stats_found"])
         return
 
     # 2. Build the Markdown table headers
     # We use left-aligned strings with fixed widths for a structured look
     table_lines = [
         "```",  # Start monospaced code block
-        f"{'Task Title':<16} | {'Tot':<3} | {'Cmp':<3} | {'%':<4}",
+        f"{labels['stats_table_header_title']:<16} | {labels['stats_table_header_total']:<3} | {labels['stats_table_header_completed']:<3} | {labels['stats_table_header_percentage']:<4}",
         "-" * 35,  # Divider line
     ]
 
@@ -151,6 +151,6 @@ async def cmd_stats(message: types.Message, db_pool, bot: Bot):
     final_message = "\n".join(table_lines)
 
     await message.answer(
-        f"📊 *Your Task Stats This Month:*\n\n{final_message}",
+        labels["user_stats_this_month"].replace("<final_message>", final_message),
         parse_mode=ParseMode.MARKDOWN_V2,
     )

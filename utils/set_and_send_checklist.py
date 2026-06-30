@@ -7,6 +7,9 @@ from .tasks import (
     fetch_all_task_instances,
 )
 from .keyboards import build_status_update_keyboard
+from utils.index import get_labels
+
+labels = get_labels().get("tasks_sending", {})
 
 def format_due_at_relative(due_at: datetime, now: datetime) -> str:
     """Return a humanized relative due date string."""
@@ -19,12 +22,18 @@ def format_due_at_relative(due_at: datetime, now: datetime) -> str:
     time_str = due_at.strftime("%H:%M")
 
     if delta.days == 0:
-        return f"today at {time_str}"
+        return labels["today_at"].replace("<due_at>", time_str)
     if delta.days == 1:
-        return f"tomorrow at {time_str}"
+        return labels["tomorrow_at"].replace("<due_at>", time_str)
     if 1 < delta.days < 7:
-        return f"in {delta.days} days at {time_str}"
-    return f"on {due_at.strftime('%Y-%m-%d')} at {time_str}"
+        return (
+            labels["overdue_days"]
+            .replace("<due_at>", str(delta.days))
+            .replace("<due_time>", time_str)
+        )
+    return labels["due"].replace(
+        "<due_at>", f"{due_at.strftime('%Y-%m-%d')} at {time_str}"
+    )
 
 
 def compute_next_due_at(frequency: str, now: datetime) -> datetime | None:
@@ -174,12 +183,12 @@ def build_task_message(
 ) -> str:
     """Build the message text for the personnel."""
 
-    task_title = record["title"] or "No title"
-    task_type = record.get("description", "umumiy")
+    task_title = record["title"] or labels["no_title"]
+    task_type = record.get("description", labels["default_task_type"])
     relative_due = format_due_at_relative(due_at, now)
 
     return (
-        f"`# {task_instance_id} | {task_type} | Due {relative_due}`\n\n"
+        f"`# {task_instance_id} | {task_type} | {labels['due'].replace('<due_at>', relative_due)}`\n\n"
         f"**📋 {task_title}**"
     )
 
@@ -250,6 +259,6 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
         if len(tasks_to_notify) == 0:
             await bot.send_message(
                 record["telegram_id"],
-                "No tasks found for today's date!",
+                labels["no_tasks_for_today"],
             )
-            print("No tasks found for today's date!")
+            print(labels["no_tasks_for_today"])
