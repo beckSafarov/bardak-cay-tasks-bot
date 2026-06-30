@@ -216,9 +216,6 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
                 )
                 tasks_to_notify.append((record, due_at, task_instance["id"]))
             elif should_notify_task:
-                print(
-                    f"latest_instance for template={record['template_id']} personnel={record['personnel_id']}: {latest_instance!r}"
-                )
                 if latest_instance is None or 'id' not in latest_instance:
                     print(
                         f"Skipping notify because latest_instance has no id: {latest_instance!r}"
@@ -237,6 +234,8 @@ async def set_and_send_checklists(db_pool: asyncpg.Pool, bot: Bot):
         tasks_to_notify.sort(key=lambda x: x[1] or datetime.max)  # Sort by due_at
 
         for record, due_at, task_instance_id, task_instance_title in tasks_to_notify:
+            if record["telegram_id"] is None:
+                continue
             try:
                 await bot.send_message(
                     record["telegram_id"],
